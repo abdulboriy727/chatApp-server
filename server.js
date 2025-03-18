@@ -6,7 +6,6 @@ const cors = require("cors");
 const socketIo = require("socket.io")
 
 const http = require("http");
-const path = require("path");
 dotenv.config()
 
 //import routes
@@ -25,13 +24,10 @@ const io = socketIo(server, {
     }
 })
 
-//static folder
-app.use(express.static(path.join(__dirname, "src", "public")));
-
 //middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(fileUpload())
+app.use(fileUpload({useTempFiles: true}))
 app.use(cors())
 
 //use routes
@@ -52,16 +48,7 @@ io.on("connection", (sokcet) => {
         io.emit("get-users", activeUsers)
     })
 
-
     sokcet.on("disconnect", () => {
-        const disconnectedUser = activeUsers.find(user => user.socketId !== sokcet.id);
-
-        if (disconnectedUser) {
-            io.emit("user-exited", {
-                userId: disconnectedUser.userId,
-                exitTime: new Date().toLocaleTimeString(),
-            });
-        }
         activeUsers = activeUsers.filter(user => user.sokcetId !== sokcet.id)
         io.emit("get-users", activeUsers)
     })

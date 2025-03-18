@@ -24,11 +24,11 @@ const userSchema = new mongoose.Schema({
         enam: [100, 101]
     },
     profilePicture: {
-        type: String,
+        type: Object,
         default: "",
     },
     coverPicture: {
-        type: String,
+        type: Object,
         default: ""
     },
     about: {

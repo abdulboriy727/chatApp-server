@@ -1,7 +1,18 @@
-const { v4 } = require("uuid")
-const path = require("path")
 const Message = require("../model/messageModel")
+const cloudinary = require("cloudinary")
 const fs = require("fs")
+
+cloudinary.config({
+    cloud_name: process.env.CLOUD_NAME,
+    api_key: process.env.CLOUD_API_KEY,
+    api_secret: process.env.CLOUD_API_SECRET,
+});
+
+const removeTempFile = (path) => {
+    fs.unlink(path, err => {
+        if (err) throw err
+    })
+}
 
 const messageCtrl = {
 
@@ -22,24 +33,25 @@ const messageCtrl = {
 
     addMessage: async (req, res) => {
         try {
-            const { chatId, senderId, text } = req.body
-            if (!chatId || !senderId || !text) {
+            const { chatId, senderId } = req.body
+            if (!chatId || !senderId) {
                 return res.status(403).send({ message: "Please fill all fields" })
             }
 
             if (req.files) {
                 if (req.files.file) {
                     const { file } = req.files
-                    const format = path.extname(file.name)
-
-                    if (format !== ".png" && format !== ".jpeg" && format !== ".jpg") {
-                        return res.status(401).send({ message: "File format is incorrect" })
-                    }
-                    const nameFile = v4() + format;
-                    file.mv(path.join(__dirname, '../', "public", nameFile), err => {
-                        if (err) throw err
-                    })
-                    req.body.file = nameFile
+                    const result = await cloudinary.v2.uploader.upload(file.tempFilePath,
+                        { folder: "ChatApp" }, async (err, data) => {
+                            if (err) {
+                                throw err
+                            } else {
+                                removeTempFile(file.tempFilePath)
+                                return data
+                            }
+                        })
+                    const imageResult = { url: result.secure_url, public_id: result.public_id }
+                    req.body.file = imageResult
                 }
             }
 
@@ -65,7 +77,8 @@ const messageCtrl = {
 
             const deletedMessage = await Message.findByIdAndDelete(id)
             if (message.file !== "") {
-                fs.unlink(path.join(__dirname, '../', "public", message.file), err => {
+                const public_id = message.file.public_id
+                await cloudinary.v2.uploader.destroy(public_id, async (err) => {
                     if (err) throw err
                 })
             }
@@ -82,7 +95,7 @@ const messageCtrl = {
             const id = req.params.id
             const message = await Message.findById(id)
             if (!message) {
-                return res.status(404).send({ message: "Message Not found" });
+                return res.status(404).send({ message: "Message not found" });
             }
 
             if (message.senderId !== req.user._id && !req.userIsAdmin) {
@@ -91,19 +104,21 @@ const messageCtrl = {
 
             if (req.files) {
                 const { file } = req.files
-                const format = path.extname(file.name)
+                const result = await cloudinary.v2.uploader.upload(file.tempFilePath,
+                    { folder: "ChatApp" }, async (err, data) => {
+                        if (err) {
+                            throw err
+                        } else {
+                            removeTempFile(file.tempFilePath)
+                            return data
+                        }
+                    })
+                const imageResult = { url: result.secure_url, public_id: result.public_id }
+                req.body.file = imageResult
 
-                if (format !== ".png" && format !== ".jpeg" && format !== ".jpg") {
-                    return res.status(401).send({ message: "File format is incorrect" })
-                }
-                const nameFile = v4() + format;
-                file.mv(path.join(__dirname, '../', "public", nameFile), err => {
-                    if (err) throw err
-                })
-
-                req.body.file = nameFile
                 if (message.file !== "") {
-                    fs.unlink(path.join(__dirname, '../', "public", message.file), err => {
+                    const public_id = message.file.public_id
+                    await cloudinary.v2.uploader.destroy(public_id, async (err) => {
                         if (err) throw err
                     })
                 }

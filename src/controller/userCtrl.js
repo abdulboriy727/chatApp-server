@@ -1,8 +1,19 @@
 const User = require("../model/userModel");
-const path = require("path")
 const bcrypt = require("bcrypt")
-const fs = require("fs");
-const { v4 } = require("uuid");
+const cloudinary = require("cloudinary")
+const fs = require("fs")
+
+cloudinary.config({
+    cloud_name: process.env.CLOUD_NAME,
+    api_key: process.env.CLOUD_API_KEY,
+    api_secret: process.env.CLOUD_API_SECRET,
+});
+
+const removeTempFile = (path) => {
+    fs.unlink(path, err => {
+        if (err) throw err
+    })
+}
 
 const UserCtrl = {
     getAll: async (req, res) => {
@@ -51,13 +62,15 @@ const UserCtrl = {
             }
 
             if (user.profilePicture !== "") {
-                fs.unlink(path.join(__dirname, '../', "public", user.profilePicture), err => {
+                const public_id = user.profilePicture.public_id
+                await cloudinary.v2.uploader.destroy(public_id, async (err) => {
                     if (err) throw err
                 })
             }
 
             if (user.coverPicture !== "") {
-                fs.unlink(path.join(__dirname, '../', "public", user.coverPicture), err => {
+                const public_id = user.coverPicture.public_id
+                await cloudinary.v2.uploader.destroy(public_id, async (err) => {
                     if (err) throw err
                 })
             }
@@ -91,19 +104,21 @@ const UserCtrl = {
             if (req.files) {
                 if (req.files.profilePicture) {
                     const { profilePicture } = req.files
-                    const format = path.extname(profilePicture.name)
+                    const result = await cloudinary.v2.uploader.upload(profilePicture.tempFilePath,
+                        { folder: "ChatApp" }, async (err, data) => {
+                            if (err) {
+                                throw err
+                            } else {
+                                removeTempFile(profilePicture.tempFilePath)
+                                return data
+                            }
+                        })
+                    const imageResult = { url: result.secure_url, public_id: result.public_id }
+                    req.body.profilePicture = imageResult
 
-                    if (format !== ".png" && format !== ".jpeg" && format !== ".jpg") {
-                        return res.status(401).send({ message: "File format is incorrect" })
-                    }
-                    const nameImg = v4() + format;
-                    profilePicture.mv(path.join(__dirname, '../', "public", nameImg), err => {
-                        if (err) throw err
-                    })
-
-                    req.body.profilePicture = nameImg
                     if (user.profilePicture !== "") {
-                        fs.unlink(path.join(__dirname, '../', "public", user.profilePicture), err => {
+                        const public_id = user.profilePicture.public_id
+                        await cloudinary.v2.uploader.destroy(public_id, async (err) => {
                             if (err) throw err
                         })
                     }
@@ -111,19 +126,21 @@ const UserCtrl = {
 
                 if (req.files.coverPicture) {
                     const { coverPicture } = req.files
-                    const format = path.extname(coverPicture.name)
+                    const result = await cloudinary.v2.uploader.upload(coverPicture.tempFilePath,
+                        { folder: "ChatApp" }, async (err, data) => {
+                            if (err) {
+                                throw err
+                            } else {
+                                removeTempFile(coverPicture.tempFilePath)
+                                return data
+                            }
+                        })
+                    const imageResult = { url: result.secure_url, public_id: result.public_id }
+                    req.body.coverPicture = imageResult
 
-                    if (format !== ".png" && format !== ".jpeg" && format !== ".jpg") {
-                        return res.status(401).send({ message: "File format is incorrect" })
-                    }
-                    const nameImg = v4() + format;
-                    coverPicture.mv(path.join(__dirname, '../', "public", nameImg), err => {
-                        if (err) throw err
-                    })
-
-                    req.body.coverPicture = nameImg
                     if (user.coverPicture !== "") {
-                        fs.unlink(path.join(__dirname, '../', "public", user.coverPicture), err => {
+                        const public_id = user.coverPicture.public_id
+                        await cloudinary.v2.uploader.destroy(public_id, async (err) => {
                             if (err) throw err
                         })
                     }
